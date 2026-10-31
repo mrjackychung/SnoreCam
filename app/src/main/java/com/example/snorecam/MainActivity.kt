@@ -64,6 +64,12 @@ class MainActivity : AppCompatActivity() {
     private var sessionEvents = ArrayList<SnoreDetector.Event>()
     private val recentEvents = ArrayList<SnoreDetector.Event>()
 
+    // 录像期间的 dB 时间序列(每 4 帧 ≈ 256ms 一个点),从视频真正开始录时算起
+    private var videoStartMs = 0L
+    private val timelineDb = ArrayList<Float>()
+    private var bucketMax = -200.0
+    private var bucketN = 0
+
     private val stopClipRunnable = Runnable { recording?.stop() }
     private val hideControlsRunnable = Runnable { if (monitoring) hideControls() }
 
@@ -238,6 +244,14 @@ class MainActivity : AppCompatActivity() {
         if (!monitoring) return
         val now = SystemClock.elapsedRealtime()
         wave.push(fr.db, fr.candidate)
+        if (videoStartMs > 0 && recording != null) {
+            bucketMax = max(bucketMax, fr.db)
+            bucketN++
+            if (bucketN >= 4) {
+                timelineDb.add(bucketMax.toFloat())
+                bucketMax = -200.0; bucketN = 0
+            }
+        }
         tvDb.text = "%.0f dB".format(fr.db)
         tvDb.setTextColor(if (fr.candidate) Color.parseColor("#FF5252") else Color.WHITE)
 
@@ -272,6 +286,8 @@ class MainActivity : AppCompatActivity() {
         busy = true
         sessionEvents = ArrayList(recentEvents)
         sessionStart = System.currentTimeMillis()
+        videoStartMs = 0L
+        timelineDb.clear(); bucketMax = -200.0; bucketN = 0
         val dir = getExternalFilesDir(Environment.DIRECTORY_MOVIES) ?: filesDir
         dir.mkdirs()
         val file = File(dir, "snore_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".mp4")
@@ -285,7 +301,10 @@ class MainActivity : AppCompatActivity() {
             var pending = recorder.prepareRecording(this, FileOutputOptions.Builder(file).build())
             if (VIDEO_WITH_AUDIO) pending = pending.withAudioEnabled()
             recording = pending.start(ContextCompat.getMainExecutor(this)) { e ->
-                if (e is VideoRecordEvent.Finalize) onFinalized(file)
+                if (e is VideoRecordEvent.Start) {
+                    videoStartMs = System.currentTimeMillis()
+                    timelineDb.clear(); bucketMax = -200.0; bucketN = 0
+                } else if (e is VideoRecordEvent.Finalize) onFinalized(file)
             }
             tvStatus.text = "● 录像中(1 分钟)"
             ui.postDelayed(stopClipRunnable, CLIP_MS)
@@ -300,10 +319,18 @@ class MainActivity : AppCompatActivity() {
         ui.removeCallbacks(stopClipRunnable)
         recording = null
         busy = false
+        val startedAt = videoStartMs
+        videoStartMs = 0L
         cameraProvider?.unbindAll()         // 录完立即关相机省电
         recentEvents.clear()
         if (file.exists() && file.length() > 0 && sessionEvents.isNotEmpty()) {
             val peaks = sessionEvents.map { it.peakDb }
+            if (startedAt > 0) {
+                val evs = sessionEvents.map {
+                    longArrayOf(it.timeMs - it.durMs - 320 - startedAt, it.durMs, Math.round(it.peakDb * 10))
+                }
+                EventStore.saveTimeline(file.absolutePath, timelineDb.toFloatArray(), evs)
+            }
             EventStore.add(this, Session(sessionStart, file.absolutePath, sessionEvents.size,
                 peaks.max(), peaks.average(), ""))
             tvStatus.text = "已保存:鼾声 ${sessionEvents.size} 次 · 平均峰值 %.1f dB".format(peaks.average())

@@ -58,6 +58,17 @@ class MainActivity : AppCompatActivity() {
     private var busy = false
     private var lastEventAt = 0L
 
+    // ---- 屏幕补光(前置摄像头时,屏幕从黑慢慢渐变成暖白并逐步提亮)----
+    private lateinit var lightView: View
+    private lateinit var btnFacing: Button
+    private lateinit var tvFill: TextView
+    private lateinit var tvRamp: TextView
+    private var fillActive = false
+    private var fadingOut = false
+    private var lightLevel = 0f
+    private var lightStart = 0L
+    private val lightRunnable = object : Runnable { override fun run() { stepLight() } }
+
     private var cameraProvider: ProcessCameraProvider? = null
     private var recording: Recording? = null
     private var sessionStart = 0L
@@ -98,6 +109,9 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(tvStatus, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM).apply { bottomMargin = dp(60) })
 
+        lightView = View(this).apply { visibility = View.GONE }
+        root.addView(lightView, FrameLayout.LayoutParams(MATCH, MATCH))
+
         controls = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -108,7 +122,7 @@ class MainActivity : AppCompatActivity() {
             text = "SnoreCam 鼾声录像"; textSize = 24f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
         })
         controls.addView(TextView(this).apply {
-            text = "\n睡前:接上充电器 → 手机立在床边,后摄对准自己 → 点开始。\n监测中点一下屏幕可唤出控制。\n"
+            text = "\n睡前:接上充电器 → 手机立在床边,摄像头对准自己 → 点开始。\n监测中点一下屏幕可唤出控制。\n"
             setTextColor(Color.LTGRAY); gravity = Gravity.CENTER
         })
         tvSens = TextView(this).apply { setTextColor(Color.WHITE); gravity = Gravity.CENTER }
@@ -123,6 +137,36 @@ class MainActivity : AppCompatActivity() {
         }
         controls.addView(seek)
         applySens(6)
+
+        btnFacing = Button(this).apply { setOnClickListener { toggleFacing() } }
+        controls.addView(btnFacing)
+        tvFill = TextView(this).apply { setTextColor(Color.WHITE); gravity = Gravity.CENTER }
+        controls.addView(tvFill)
+        controls.addView(SeekBar(this).apply {
+            max = 95
+            progress = ((Prefs.fillMax(this@MainActivity) - 0.05f) * 100).toInt().coerceIn(0, 95)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
+                    Prefs.setFillMax(this@MainActivity, 0.05f + p / 100f); updateFacingUi()
+                }
+                override fun onStartTrackingTouch(s: SeekBar?) {}
+                override fun onStopTrackingTouch(s: SeekBar?) {}
+            })
+        })
+        tvRamp = TextView(this).apply { setTextColor(Color.WHITE); gravity = Gravity.CENTER }
+        controls.addView(tvRamp)
+        controls.addView(SeekBar(this).apply {
+            max = 50
+            progress = (Prefs.rampSec(this@MainActivity) - 10).coerceIn(0, 50)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(s: SeekBar?, p: Int, u: Boolean) {
+                    Prefs.setRampSec(this@MainActivity, 10 + p); updateFacingUi()
+                }
+                override fun onStartTrackingTouch(s: SeekBar?) {}
+                override fun onStopTrackingTouch(s: SeekBar?) {}
+            })
+        })
+        updateFacingUi()
         btnStart = Button(this).apply { text = "开始监测"; setOnClickListener { onStartStopClicked() } }
         controls.addView(btnStart)
         controls.addView(Button(this).apply {
@@ -140,6 +184,76 @@ class MainActivity : AppCompatActivity() {
         val margin = 4 + p
         detector.marginDb = margin.toDouble()
         tvSens.text = "\n灵敏度:高于环境噪声 $margin dB 才算鼾声(越小越灵敏)"
+    }
+
+    // ---------- 摄像头选择 + 补光 ----------
+
+    private fun toggleFacing() {
+        Prefs.setFacing(this, if (Prefs.facing(this) == "front") "back" else "front")
+        updateFacingUi()
+    }
+
+    private fun updateFacingUi() {
+        val front = Prefs.facing(this) == "front"
+        btnFacing.text = if (front) "摄像头:前置(屏幕补光)· 点击切换" else "摄像头:后置 · 点击切换"
+        tvFill.text = "\n补光最大亮度:${(Prefs.fillMax(this) * 100).toInt()}%(只在前置时使用)"
+        tvRamp.text = "渐亮时长:${Prefs.rampSec(this)} 秒(越长越不刺眼)"
+    }
+
+    private fun applyLight() {
+        val l = lightLevel
+        lightView.setBackgroundColor(Color.rgb((255 * l).toInt(), (244 * l).toInt(), (224 * l).toInt()))
+        if (controls.visibility != View.VISIBLE) setBrightness(0.01f + (Prefs.fillMax(this) - 0.01f) * l)
+    }
+
+    private fun stepLight() {
+        if (!fillActive) return
+        if (fadingOut) {
+            lightLevel -= 0.05f
+            if (lightLevel <= 0f) {
+                lightLevel = 0f
+                fillActive = false
+                fadingOut = false
+                lightView.visibility = View.GONE
+                enterIdleUi()
+                return
+            }
+        } else {
+            val total = Prefs.rampSec(this) * 1000f
+            val t = ((SystemClock.elapsedRealtime() - lightStart) / total).coerceIn(0f, 1f)
+            lightLevel = t * t          // 平方曲线:开头很缓,后面才明显变亮
+        }
+        applyLight()
+        ui.postDelayed(lightRunnable, 100)
+    }
+
+    private fun startFillLight() {
+        if (Prefs.facing(this) != "front") return
+        ui.removeCallbacks(lightRunnable)
+        fillActive = true
+        fadingOut = false
+        lightLevel = 0f
+        lightStart = SystemClock.elapsedRealtime()
+        wave.visibility = View.GONE; tvDb.visibility = View.GONE; tvStatus.visibility = View.GONE
+        lightView.visibility = View.VISIBLE
+        applyLight()
+        ui.postDelayed(lightRunnable, 100)
+    }
+
+    /** 录完后约 2 秒内慢慢熄灭,回到黑屏 */
+    private fun stopFillLight() {
+        if (!fillActive) return
+        fadingOut = true
+        ui.removeCallbacks(lightRunnable)
+        ui.post(lightRunnable)
+    }
+
+    private fun killFillLight() {
+        ui.removeCallbacks(lightRunnable)
+        fillActive = false
+        fadingOut = false
+        lightLevel = 0f
+        lightView.visibility = View.GONE
     }
 
     // ---------- 开始 / 停止 ----------
@@ -169,6 +283,7 @@ class MainActivity : AppCompatActivity() {
         monitoring = false
         running = false
         ui.removeCallbacks(hideControlsRunnable)
+        killFillLight()
         recording?.stop()   // Finalize 回调里会保存记录
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setBrightness(-1f)
@@ -186,12 +301,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun enterIdleUi() {
         activeUi = false
+        if (fillActive) return
         wave.visibility = View.GONE; tvDb.visibility = View.GONE; tvStatus.visibility = View.GONE
         if (controls.visibility != View.VISIBLE) setBrightness(BRIGHT_IDLE)
     }
 
     private fun enterActiveUi() {
         activeUi = true
+        if (fillActive) return
         wave.visibility = View.VISIBLE; tvDb.visibility = View.VISIBLE; tvStatus.visibility = View.VISIBLE
         if (controls.visibility != View.VISIBLE) setBrightness(BRIGHT_ACTIVE)
     }
@@ -205,7 +322,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hideControls() {
         controls.visibility = View.GONE
-        setBrightness(if (activeUi) BRIGHT_ACTIVE else BRIGHT_IDLE)
+        if (fillActive) applyLight() else setBrightness(if (activeUi) BRIGHT_ACTIVE else BRIGHT_IDLE)
     }
 
     // ---------- 音频采集 + 检测 ----------
@@ -297,7 +414,18 @@ class MainActivity : AppCompatActivity() {
             ).build()
             val vc = VideoCapture.withOutput(recorder)
             provider.unbindAll()
-            provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, vc)
+            val front = Prefs.facing(this) == "front"
+            val cam = provider.bindToLifecycle(
+                this,
+                if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA,
+                vc
+            )
+            try {   // 夜间:把曝光补偿调高一些,画面更亮
+                val es = cam.cameraInfo.exposureState
+                if (es.isExposureCompensationSupported) {
+                    cam.cameraControl.setExposureCompensationIndex(es.exposureCompensationRange.upper * 2 / 3)
+                }
+            } catch (_: Exception) {}
             var pending = recorder.prepareRecording(this, FileOutputOptions.Builder(file).build())
             if (VIDEO_WITH_AUDIO) pending = pending.withAudioEnabled()
             recording = pending.start(ContextCompat.getMainExecutor(this)) { e ->
@@ -308,6 +436,7 @@ class MainActivity : AppCompatActivity() {
             }
             tvStatus.text = "● 录像中(1 分钟)"
             ui.postDelayed(stopClipRunnable, CLIP_MS)
+            startFillLight()
         } catch (e: Exception) {
             busy = false
             recording = null
@@ -321,6 +450,7 @@ class MainActivity : AppCompatActivity() {
         busy = false
         val startedAt = videoStartMs
         videoStartMs = 0L
+        stopFillLight()
         cameraProvider?.unbindAll()         // 录完立即关相机省电
         recentEvents.clear()
         if (file.exists() && file.length() > 0 && sessionEvents.isNotEmpty()) {
@@ -339,6 +469,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        ui.removeCallbacks(lightRunnable)
         running = false
         recording?.stop()
         cameraProvider?.unbindAll()

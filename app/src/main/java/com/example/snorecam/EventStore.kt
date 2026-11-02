@@ -30,6 +30,27 @@ object Prefs {
     fun setCamMode(c: Context, m: String) {
         c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putString("camMode", m).apply()
     }
+
+    /** 录像用哪个摄像头:"back" 后置 / "front" 前置(前置时屏幕当补光灯) */
+    fun facing(c: Context): String =
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getString("facing", "back") ?: "back"
+    fun setFacing(c: Context, v: String) {
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putString("facing", v).apply()
+    }
+
+    /** 补光时屏幕亮度上限 0.05~1.0 */
+    fun fillMax(c: Context): Float =
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getFloat("fillMax", 0.30f)
+    fun setFillMax(c: Context, v: Float) {
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putFloat("fillMax", v).apply()
+    }
+
+    /** 从黑到最亮用多少秒 */
+    fun rampSec(c: Context): Int =
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getInt("rampSec", 25)
+    fun setRampSec(c: Context, v: Int) {
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putInt("rampSec", v).apply()
+    }
 }
 
 object Posture {

@@ -22,6 +22,8 @@
         </activity>
 
         <activity android:name=".ReviewActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".TestActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".LogActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".PlaybackActivity" android:exported="false" android:screenOrientation="portrait" android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <provider

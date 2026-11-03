@@ -6,7 +6,10 @@ import kotlin.math.*
  * 鼾声检测(纯规则,无模型):
  * 1. 每帧(1024 采样 ≈ 64ms @16kHz)算 dB
  * 2. 帧能量高于「自适应噪声底 + margin」且低频(80~1000Hz)能量占比高 → 候选帧
- * 3. 连续候选帧 0.3~5 秒(允许 <0.32 秒的间隙)→ 一次鼾声事件
+ * 3. 连续候选帧 0.3~5 秒(允许 <0.32 秒的间隙)→ 一次鼾声事件;持续超过 5 秒的连续鼾声每 5 秒算一次事件
+ *
+ * 噪声底始终在跟踪(不管当前是不是候选帧),这样空调/风扇等持续低频噪声会被"学"成背景,
+ * 不会让每一帧都被当成鼾声。
  */
 class SnoreDetector {
     companion object {
@@ -15,19 +18,25 @@ class SnoreDetector {
 
         /**
          * dBFS → 近似 dB(SPL) 的偏移。手机麦克风没校准,数值只能做"同一台手机、同一位置"的相对比较。
-         * 如果有分贝计 App,可对着同一声源对比后改这个值。
          */
         const val DB_OFFSET = 90.0
     }
 
     data class Event(val timeMs: Long, val peakDb: Double, val avgDb: Double, val durMs: Long)
-    data class Frame(val db: Double, val candidate: Boolean, val event: Event?)
+    data class Frame(
+        val db: Double,
+        val candidate: Boolean,
+        val event: Event?,
+        val noise: Double,
+        val threshold: Double
+    )
 
     @Volatile var marginDb = 10.0   // 高于噪声底多少 dB 才算候选
-    @Volatile var minDb = 40.0      // 绝对下限
-    private val lowRatioMin = 0.55
+    @Volatile var minDb = 35.0      // 绝对下限
+    @Volatile var noiseFloor = 30.0 // 当前噪声底(可外部设初值)
+    private val lowRatioMin = 0.5
 
-    private var noise = 30.0
+    private var frames = 0
     private var run = 0
     private var gap = 0
     private var peak = -200.0
@@ -36,6 +45,11 @@ class SnoreDetector {
     private val re = DoubleArray(FRAME)
     private val im = DoubleArray(FRAME)
     private val win = DoubleArray(FRAME) { 0.5 - 0.5 * cos(2 * PI * it / (FRAME - 1)) }
+
+    /** 延迟结束后重新开始检测前调用:清掉计数,噪声底重新快速适应 */
+    fun reset() {
+        frames = 0; run = 0; gap = 0; peak = -200.0; sumDb = 0.0
+    }
 
     fun process(buf: ShortArray): Frame {
         var sum = 0.0
@@ -58,25 +72,33 @@ class SnoreDetector {
         }
         val ratio = if (tot > 0) low / tot else 0.0
 
+        // 噪声底:下降快、上升慢;刚启动的 10 秒内上升快一些,尽快适应环境
+        frames++
+        val up = if (frames < 160) 0.03 else 0.001
+        var noise = noiseFloor
+        noise = if (db < noise) 0.9 * noise + 0.1 * db else noise + up * (db - noise)
+        noiseFloor = noise
+
         val threshold = max(minDb, noise + marginDb)
         val cand = db > threshold && ratio > lowRatioMin
-        if (!cand) {
-            noise = if (db < noise) 0.9 * noise + 0.1 * db else noise + 0.0002 * (db - noise)
-        }
 
         var event: Event? = null
         if (cand) {
             run++; gap = 0; peak = max(peak, db); sumDb += db
+            if (run >= 80) {
+                event = Event(System.currentTimeMillis(), peak, sumDb / run, run * 64L)
+                run = 0; peak = -200.0; sumDb = 0.0
+            }
         } else if (run > 0) {
             gap++
             if (gap > 5) {
-                if (run in 5..80) {
+                if (run >= 5) {
                     event = Event(System.currentTimeMillis(), peak, sumDb / run, run * 64L)
                 }
                 run = 0; gap = 0; peak = -200.0; sumDb = 0.0
             }
         }
-        return Frame(db, cand, event)
+        return Frame(db, cand, event, noise, threshold)
     }
 
     private fun fft() {

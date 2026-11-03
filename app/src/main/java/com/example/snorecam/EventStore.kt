@@ -31,6 +31,20 @@ object Prefs {
         c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putString("camMode", m).apply()
     }
 
+    /** 灵敏度:高于环境噪声多少 dB 才算鼾声(4~20) */
+    fun margin(c: Context): Int =
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getInt("margin", 10)
+    fun setMargin(c: Context, v: Int) {
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putInt("margin", v).apply()
+    }
+
+    /** 点开始后延迟多少分钟才开始检测(睡前听音乐用),0 = 不延迟 */
+    fun delayMin(c: Context): Int =
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getInt("delayMin", 0)
+    fun setDelayMin(c: Context, v: Int) {
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putInt("delayMin", v).apply()
+    }
+
     /** 录像用哪个摄像头:"back" 后置 / "front" 前置(前置时屏幕当补光灯) */
     fun facing(c: Context): String =
         c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getString("facing", "back") ?: "back"

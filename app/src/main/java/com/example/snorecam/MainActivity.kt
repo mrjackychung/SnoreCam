@@ -278,7 +278,7 @@ class MainActivity : AppCompatActivity() {
         }
         set.addView(seekSens)
         set.addView(label("数值越小越灵敏。不知道设多少?做个测试,我来推荐。", 12f), lp(2))
-        set.addView(softButton("🎤  测试灵敏度,获取推荐值") {
+        set.addView(softButton("🎤📷  测试声音灵敏度 + 人脸画面") {
             startActivity(Intent(this, TestActivity::class.java))
         }, lp(8))
 
@@ -321,6 +321,7 @@ class MainActivity : AppCompatActivity() {
             })
         }
         fillBox.addView(seekRamp)
+        fillBox.addView(label("屏幕会先渐亮到设定亮度,亮了之后才开始录像,所以每段视频一开始就是亮的。", 12f), lp(4))
         set.addView(fillBox, lp(0))
         col.addView(set, lp(12))
 
@@ -512,6 +513,8 @@ class MainActivity : AppCompatActivity() {
         armed = true
         btnArmNow.visibility = View.GONE
         killFillLight()
+        waitingLight = false
+        if (busy && recording == null) { busy = false; cameraProvider?.unbindAll() }
         recording?.stop()   // Finalize 回调里会保存记录
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setBrightness(-1f)
@@ -607,6 +610,7 @@ class MainActivity : AppCompatActivity() {
             val total = Prefs.rampSec(this) * 1000f
             val t = ((SystemClock.elapsedRealtime() - lightStart) / total).coerceIn(0f, 1f)
             lightLevel = t * t          // 平方曲线:开头很缓,后面才明显变亮
+            if (waitingLight && t >= 1f) beginRecordingNow()   // 屏幕亮到设定亮度后才开始录像
         }
         applyLight()
         ui.postDelayed(lightRunnable, 100)
@@ -690,12 +694,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 录像卡死保护:超过 clip+30 秒还没结束就强制复位,保证后面还能继续录
-        if (busy && now - busySince > CLIP_MS + 30_000L) {
+        if (busy && now - busySince > CLIP_MS + Prefs.rampSec(this) * 1000L + 30_000L) {
             MonLog.log(this, "⚠ 录像超时未结束,强制复位")
             ui.removeCallbacks(stopClipRunnable)
             try { recording?.stop() } catch (_: Exception) {}
             recording = null
             busy = false
+            waitingLight = false
             cameraProvider?.unbindAll()
             stopFillLight()
         }
@@ -709,7 +714,7 @@ class MainActivity : AppCompatActivity() {
     private fun onSnore(ev: SnoreDetector.Event) {
         MonLog.log(this, "鼾声 峰值%.1f dB 平均%.1f dB 时长%d ms".format(ev.peakDb, ev.avgDb, ev.durMs))
         if (recording != null || busy) {
-            if (recording != null) sessionEvents.add(ev)
+            sessionEvents.add(ev)
             tvStatus.text = "● 录像中  鼾声 ${sessionEvents.size} 次 · 本次峰值 %.1f dB".format(ev.peakDb)
             return
         }
@@ -727,6 +732,11 @@ class MainActivity : AppCompatActivity() {
     //  1 分钟录像
     // =====================================================================
 
+    private var pendingRecorder: Recorder? = null
+    private var pendingFile: File? = null
+    private var waitingLight = false
+
+    /** 触发:前置摄像头时先让屏幕渐亮,亮到设定亮度后再开始录像;后置摄像头直接录 */
     private fun startRecording() {
         val provider = cameraProvider
         if (provider == null) { MonLog.log(this, "⚠ 相机还没准备好,本次未录"); return }
@@ -758,6 +768,33 @@ class MainActivity : AppCompatActivity() {
                     cam.cameraControl.setExposureCompensationIndex(es.exposureCompensationRange.upper * 2 / 3)
                 }
             } catch (_: Exception) {}
+            pendingRecorder = recorder
+            pendingFile = file
+        } catch (e: Exception) {
+            busy = false
+            MonLog.log(this, "⚠ 相机启动失败:${e.message}")
+            return
+        }
+        if (Prefs.facing(this) == "front") {
+            waitingLight = true
+            MonLog.log(this, "前置补光:屏幕亮到设定亮度后再开始录像(约 ${Prefs.rampSec(this)} 秒)")
+            startFillLight()
+        } else {
+            beginRecordingNow()
+        }
+    }
+
+    /** 真正开始录像(前置时在屏幕渐亮完成后调用) */
+    private fun beginRecordingNow() {
+        waitingLight = false
+        val recorder = pendingRecorder
+        val file = pendingFile
+        if (recorder == null || file == null) {
+            busy = false
+            stopFillLight()
+            return
+        }
+        try {
             var pending = recorder.prepareRecording(this, FileOutputOptions.Builder(file).build())
             if (VIDEO_WITH_AUDIO) pending = pending.withAudioEnabled()
             recording = pending.start(ContextCompat.getMainExecutor(this)) { e ->
@@ -768,12 +805,13 @@ class MainActivity : AppCompatActivity() {
             }
             tvStatus.text = "● 录像中(1 分钟)"
             ui.postDelayed(stopClipRunnable, CLIP_MS)
-            startFillLight()
+            MonLog.log(this, "开始录像")
         } catch (e: Exception) {
             busy = false
             recording = null
+            cameraProvider?.unbindAll()
+            stopFillLight()
             MonLog.log(this, "⚠ 录像启动失败:${e.message}")
-            tvStatus.text = "录像失败:${e.message}"
         }
     }
 

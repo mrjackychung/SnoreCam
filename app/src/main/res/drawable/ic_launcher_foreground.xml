@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 月亮 -->
+    <path
+        android:fillColor="#FFD58A"
+        android:pathData="M50,19 A12,12 0 1 0 50,41 A15,15 0 0 1 50,19 Z" />
+
+    <!-- 声浪:按响度着色(安静 → 轻微 → 超响 → 响亮 → 轻微) -->
+    <path android:strokeColor="#4B7F86" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M32,56 L32,68" />
+    <path android:strokeColor="#2FBFA5" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M43,49 L43,75" />
+    <path android:strokeColor="#F0703C" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M54,40 L54,84" />
+    <path android:strokeColor="#E0B070" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M65,47 L65,77" />
+    <path android:strokeColor="#2FBFA5" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M76,55 L76,69" />
+</vector>

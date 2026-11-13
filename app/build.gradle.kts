@@ -10,8 +10,19 @@ android {
         applicationId = "com.example.snorecam"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        // GitHub Actions 每次编译的序号自动当作 versionCode,新包永远比旧包"新"
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "1.0"
+    }
+    // 固定签名:每次编译都用同一把钥匙签名,手机才允许直接覆盖更新(否则要先卸载)
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            storeType = "pkcs12"
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

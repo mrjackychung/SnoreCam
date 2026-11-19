@@ -1,14 +1,21 @@
 package com.example.snorecam
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
@@ -81,6 +88,16 @@ class PlaybackActivity : AppCompatActivity() {
         top.addView(TextView(this).apply {
             text = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(Date(session.id))
             textSize = 16f; setTextColor(Color.WHITE)
+        })
+        top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        top.addView(TextView(this).apply {
+            text = "💾 保存"; textSize = 14f; setTextColor(Theme.ACCENT)
+            setPadding(dp(10), dp(8), dp(10), dp(8)); setOnClickListener { saveVideo() }
+        })
+        top.addView(TextView(this).apply {
+            text = "📤 分享"; textSize = 14f; setTextColor(Theme.ACCENT)
+            setPadding(dp(10), dp(8), dp(4), dp(8))
+            setOnClickListener { Exporter.share(this@PlaybackActivity, File(session.file)) }
         })
         root.addView(top)
 
@@ -217,26 +234,35 @@ class PlaybackActivity : AppCompatActivity() {
         refreshLabels()
     }
 
-    private fun runAnalysis() {
-        tvPosture.text = "姿势识别中…"
-        Thread {
-            val face = try { PostureAnalyzer.analyze(session.file) } catch (e: Throwable) { "none" }
-            runOnUiThread { if (!isFinishing) applyFace(face) }
-        }.start()
+    private val storagePerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) saveVideo() else Toast.makeText(this, "没有存储权限,无法保存", Toast.LENGTH_LONG).show()
     }
 
-    private fun applyFace(face: String) {
-        val all = EventStore.load(this)
-        val s = all.find { it.id == session.id } ?: return
-        s.face = face
-        val auto = Posture.labelFor(face, Prefs.camMode(this))
-        if (auto.isNotEmpty() && (s.label.isEmpty() || s.autoLabel)) {
-            s.label = auto
-            s.autoLabel = true
+    /** 把录像复制到手机相册(Movies/SnoreCam),可在相册/文件管理器里看到并拷走 */
+    private fun saveVideo() {
+        if (Build.VERSION.SDK_INT < 29 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            storagePerm.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
         }
-        EventStore.save(this, all)
-        session = s
-        refreshLabels()
+        val ok = Exporter.saveToGallery(this, File(session.file))
+        Toast.makeText(this, if (ok) "已保存到相册(Movies/SnoreCam)" else "保存失败", Toast.LENGTH_LONG).show()
+    }
+
+    private fun runAnalysis() {
+        tvPosture.text = "姿势识别中…"
+        val appCtx = applicationContext
+        val id = session.id
+        val path = session.file
+        Thread {
+            PostureAnalyzer.analyzeSession(appCtx, id, path)
+            runOnUiThread {
+                if (!isFinishing) {
+                    EventStore.load(this).find { it.id == id }?.let { session = it }
+                    refreshLabels()
+                }
+            }
+        }.start()
     }
 
     override fun onResume() {

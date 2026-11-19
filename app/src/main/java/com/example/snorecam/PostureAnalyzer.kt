@@ -25,6 +25,23 @@ object PostureAnalyzer {
 
     data class FaceHit(val yaw: Float, val rotation: Int)
 
+    /**
+     * 分析一段录像的姿势并写回记录:录完后自动调用,不用再点开录像。
+     * 没有手动标记过(或标记本来就是自动的)才会写入自动标签。要在后台线程调用。
+     */
+    fun analyzeSession(ctx: android.content.Context, id: Long, path: String): String {
+        val face = try { analyze(path) } catch (e: Throwable) { "none" }
+        EventStore.update(ctx, id) { s ->
+            s.face = face
+            val auto = Posture.labelFor(face, Prefs.camMode(ctx))
+            if (auto.isNotEmpty() && (s.label.isEmpty() || s.autoLabel)) {
+                s.label = auto
+                s.autoLabel = true
+            }
+        }
+        return face
+    }
+
     fun newDetector(): FaceDetector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)

@@ -82,6 +82,7 @@ object Posture {
 object EventStore {
     private fun f(ctx: Context) = File(ctx.filesDir, "sessions.json")
 
+    @Synchronized
     fun load(ctx: Context): MutableList<Session> {
         val out = mutableListOf<Session>()
         try {
@@ -97,6 +98,7 @@ object EventStore {
         return out
     }
 
+    @Synchronized
     fun save(ctx: Context, list: List<Session>) {
         val arr = JSONArray()
         list.forEach {
@@ -107,8 +109,19 @@ object EventStore {
         f(ctx).writeText(arr.toString())
     }
 
+    @Synchronized
     fun add(ctx: Context, s: Session) {
         val l = load(ctx); l.add(s); save(ctx, l)
+    }
+
+    /** 原子地修改某一段记录(后台识别姿势和界面标记可能同时发生) */
+    @Synchronized
+    fun update(ctx: Context, id: Long, block: (Session) -> Unit): Session? {
+        val all = load(ctx)
+        val s = all.find { it.id == id } ?: return null
+        block(s)
+        save(ctx, all)
+        return s
     }
 
     fun saveTimeline(videoPath: String, db: FloatArray, events: List<LongArray>) {

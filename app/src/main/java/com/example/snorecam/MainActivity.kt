@@ -353,6 +353,10 @@ class MainActivity : AppCompatActivity() {
             "💡  用前置补光时,屏幕要朝向你"
         )) tips.addView(label(t, 14f, Color.WHITE), lp(8))
         col.addView(tips, lp(16))
+        val vc = try {
+            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(packageManager.getPackageInfo(packageName, 0))
+        } catch (e: Exception) { 0L }
+        col.addView(label("SnoreCam 版本 v$vc", 11f).apply { gravity = Gravity.CENTER }, lp(14))
     }
 
     private fun buildPanel() {
@@ -836,6 +840,14 @@ class MainActivity : AppCompatActivity() {
             EventStore.add(this, Session(sessionStart, file.absolutePath, sessionEvents.size,
                 peaks.max(), peaks.average(), ""))
             clipsSaved++
+            // 录完马上在后台识别姿势(正脸/侧脸 → 侧睡/仰睡),不用等到点开录像
+            val sid = sessionStart
+            val vpath = file.absolutePath
+            val appCtx = applicationContext
+            Thread {
+                val face = PostureAnalyzer.analyzeSession(appCtx, sid, vpath)
+                MonLog.log(appCtx, "姿势识别:" + when (face) { "frontal" -> "正脸"; "profile" -> "侧脸"; else -> "没识别到人脸" })
+            }.start()
             MonLog.log(this, "已保存录像 ${file.name} 鼾声${sessionEvents.size}次 平均峰值%.1f dB 大小${file.length() / 1024}KB".format(peaks.average()))
             tvStatus.text = "已保存:鼾声 ${sessionEvents.size} 次 · 平均峰值 %.1f dB".format(peaks.average())
         } else {

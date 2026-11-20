@@ -52,7 +52,7 @@ object Exporter {
                 .setType("video/mp4")
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            ctx.startActivity(Intent.createChooser(i, "分享录像"))
+            ctx.startActivity(Intent.createChooser(i, Str.shareVideo()))
         } catch (_: Exception) {}
     }
 }

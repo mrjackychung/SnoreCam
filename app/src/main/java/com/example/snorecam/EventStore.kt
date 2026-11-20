@@ -31,6 +31,13 @@ object Prefs {
         c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putString("camMode", m).apply()
     }
 
+    /** 界面语言:"auto" 跟随手机 / "zh-Hans" / "zh-Hant" / "en" */
+    fun lang(c: Context): String =
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getString("lang", "auto") ?: "auto"
+    fun setLang(c: Context, v: String) {
+        c.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit().putString("lang", v).apply()
+    }
+
     /** 灵敏度:高于环境噪声多少 dB 才算鼾声(4~20) */
     fun margin(c: Context): Int =
         c.getSharedPreferences("prefs", Context.MODE_PRIVATE).getInt("margin", 10)

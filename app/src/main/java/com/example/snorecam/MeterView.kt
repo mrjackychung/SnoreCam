@@ -40,14 +40,14 @@ class MeterView(ctx: Context) : View(ctx) {
             p.color = Color.parseColor("#9FB0C3")
             c.drawLine(nx, top - 3 * d, nx, top + bh + 3 * d, p)
             p.textAlign = Paint.Align.RIGHT
-            c.drawText("环境 ${noise.toInt()}", nx - 3 * d, top + bh + 15 * d, p)
+            c.drawText(Str.meterNoise(noise.toInt()), nx - 3 * d, top + bh + 15 * d, p)
         }
         if (threshold >= 0) {
             val tx = x(threshold)
             p.color = Theme.ACCENT
             c.drawLine(tx, top - 3 * d, tx, top + bh + 3 * d, p)
             p.textAlign = Paint.Align.LEFT
-            c.drawText("触发线 ${threshold.toInt()}", tx + 3 * d, top + bh + 15 * d, p)
+            c.drawText(Str.meterThr(threshold.toInt()), tx + 3 * d, top + bh + 15 * d, p)
         }
     }
 }

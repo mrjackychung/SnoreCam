@@ -14,7 +14,7 @@ object Theme {
     val NONE = Color.parseColor("#6B7888")
 
     fun labelColor(l: String): Int = when (l) { "side" -> SIDE; "supine" -> SUPINE; else -> NONE }
-    fun labelName(l: String): String = when (l) { "side" -> "侧睡"; "supine" -> "仰睡"; else -> "未标记" }
+    fun labelName(l: String): String = Str.labelName(l)
     fun rounded(color: Int, radiusPx: Float): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = radiusPx }
 }

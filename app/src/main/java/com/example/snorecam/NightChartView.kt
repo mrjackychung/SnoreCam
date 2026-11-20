@@ -45,7 +45,7 @@ class NightChartView(ctx: Context) : View(ctx) {
 
         if (sessions.isEmpty()) {
             p.color = Theme.SUB; p.textSize = 13 * d; p.textAlign = Paint.Align.CENTER
-            c.drawText("这一晚没有记录", w / 2, h / 2, p)
+            c.drawText(Str.chartEmpty(), w / 2, h / 2, p)
             return
         }
         val left = 30 * d

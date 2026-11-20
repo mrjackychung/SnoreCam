@@ -70,7 +70,7 @@ class AudioEngine(
             if (rec == null) {
                 rec = open()
                 if (rec == null) {
-                    note("麦克风打开失败,2 秒后重试")
+                    note("Microphone failed to open, retrying in 2 s")
                     try { Thread.sleep(2000) } catch (_: InterruptedException) {}
                     continue
                 }
@@ -85,7 +85,7 @@ class AudioEngine(
             }
             if (gen != my) break
             if (err) {
-                note("麦克风读取出错,已重新打开")
+                note("Microphone read error, reopened")
                 try { cur.stop() } catch (_: Exception) {}
                 cur.release()
                 rec = null
@@ -96,7 +96,7 @@ class AudioEngine(
             for (v in buf) { if (v.toInt() != 0) { allZero = false; break } }
             zeroFrames = if (allZero) zeroFrames + 1 else 0
             if (zeroFrames >= 80) {
-                note("麦克风持续静音(可能被系统或录像占用),已重新打开")
+                note("Microphone silent for a while (maybe taken by system/recording), reopened")
                 try { cur.stop() } catch (_: Exception) {}
                 cur.release()
                 rec = null

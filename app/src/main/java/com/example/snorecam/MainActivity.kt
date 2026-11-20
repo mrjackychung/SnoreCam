@@ -135,7 +135,7 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             if (!monitoring) return
             if (countdown > 0) {
-                tvPanelTitle.text = "$countdown 秒后屏幕变黑,请放好手机"
+                tvPanelTitle.text = Str.countdown(countdown)
                 countdown--
                 ui.postDelayed(this, 1000)
             } else {
@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
     private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
         val allOk = r.values.all { it }
         if (pendingStart && allOk) startMonitoring()
-        else if (pendingStart) Toast.makeText(this, "需要相机和麦克风权限才能监测", Toast.LENGTH_LONG).show()
+        else if (pendingStart) Toast.makeText(this, Str.needPerms(), Toast.LENGTH_LONG).show()
         pendingStart = false
         refreshPreview()
     }
@@ -163,6 +163,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Str.init(this)
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
 
         wave = WaveformView(this).apply { visibility = View.GONE }
@@ -228,11 +229,11 @@ class MainActivity : AppCompatActivity() {
         home = ScrollView(this).apply { setBackgroundColor(Theme.BG); addView(col) }
 
         col.addView(label("SnoreCam", 30f, Color.WHITE).apply { typeface = Typeface.DEFAULT_BOLD })
-        col.addView(label("睡前点一下,打呼时自动录像,早上对比侧睡和仰睡哪个更响", 14f), lp(4))
+        col.addView(label(Str.homeSubtitle(), 14f), lp(4))
 
         // --- 实时环境声音 ---
         val live = card()
-        live.addView(label("当前环境声音"))
+        live.addView(label(Str.liveTitle()))
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM }
         tvLiveDb = TextView(this).apply {
             text = "--"; textSize = 44f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
@@ -246,7 +247,7 @@ class MainActivity : AppCompatActivity() {
         live.addView(meter, LinearLayout.LayoutParams(MATCH, dp(40)))
         tvThresh = label("", 12f)
         live.addView(tvThresh, lp(2))
-        btnGrant = softButton("授权麦克风,显示实时分贝") {
+        btnGrant = softButton(Str.grantMic()) {
             permLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
         }.apply { visibility = View.GONE }
         live.addView(btnGrant, lp(8))
@@ -254,14 +255,14 @@ class MainActivity : AppCompatActivity() {
 
         // --- 设置 ---
         val set = card()
-        set.addView(label("摄像头"))
+        set.addView(label(Str.camera()))
         val seg = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             background = Theme.rounded(Theme.BG, dpf(12f))
             setPadding(dp(3), dp(3), dp(3), dp(3))
         }
-        segBack = segItem("后置摄像头") { Prefs.setFacing(this, "back"); updateFacingUi() }
-        segFront = segItem("前置 · 屏幕补光") { Prefs.setFacing(this, "front"); updateFacingUi() }
+        segBack = segItem(Str.backCam()) { Prefs.setFacing(this, "back"); updateFacingUi() }
+        segFront = segItem(Str.frontCamLight()) { Prefs.setFacing(this, "front"); updateFacingUi() }
         seg.addView(segBack, LinearLayout.LayoutParams(0, dp(40), 1f))
         seg.addView(segFront, LinearLayout.LayoutParams(0, dp(40), 1f))
         set.addView(seg, lp(6))
@@ -277,8 +278,8 @@ class MainActivity : AppCompatActivity() {
             })
         }
         set.addView(seekSens)
-        set.addView(label("数值越小越灵敏。不知道设多少?做个测试,我来推荐。", 12f), lp(2))
-        set.addView(softButton("🎤📷  测试声音灵敏度 + 人脸画面") {
+        set.addView(label(Str.sensHint(), 12f), lp(2))
+        set.addView(softButton(Str.testBtn()) {
             startActivity(Intent(this, TestActivity::class.java))
         }, lp(8))
 
@@ -292,7 +293,7 @@ class MainActivity : AppCompatActivity() {
         }
         set.addView(seekDelay)
         val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        for ((txt, mins) in listOf("不延迟" to 0, "30分钟" to 30, "45分钟" to 45, "60分钟" to 60)) {
+        for ((txt, mins) in listOf(Str.noDelay() to 0, Str.minutes(30) to 30, Str.minutes(45) to 45, Str.minutes(60) to 60)) {
             chips.addView(softButton(txt) {
                 Prefs.setDelayMin(this, mins)
                 seekDelay.progress = mins / 5
@@ -300,7 +301,7 @@ class MainActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(0, dp(40), 1f).apply { setMargins(dp(3), 0, dp(3), 0) })
         }
         set.addView(chips, lp(8))
-        set.addView(label("延迟期间不听声音、不录像,几乎不耗电。比音乐时长多留 5~10 分钟更稳。", 12f), lp(4))
+        set.addView(label(Str.delayHint(), 12f), lp(4))
 
         fillBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         tvFill = label("", 13f, Color.WHITE)
@@ -321,13 +322,13 @@ class MainActivity : AppCompatActivity() {
             })
         }
         fillBox.addView(seekRamp)
-        fillBox.addView(label("屏幕会先渐亮到设定亮度,亮了之后才开始录像,所以每段视频一开始就是亮的。", 12f), lp(4))
+        fillBox.addView(label(Str.fillHint(), 12f), lp(4))
         set.addView(fillBox, lp(0))
         col.addView(set, lp(12))
 
         // --- 开始 ---
         btnStart = Button(this).apply {
-            text = "开始监测"; textSize = 18f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
+            text = Str.startMonitoring(); textSize = 18f; isAllCaps = false; typeface = Typeface.DEFAULT_BOLD
             setTextColor(Color.parseColor("#1A1100"))
             background = Theme.rounded(Theme.ACCENT, dpf(18f))
             setOnClickListener { onStartClicked() }
@@ -335,28 +336,48 @@ class MainActivity : AppCompatActivity() {
         col.addView(btnStart, LinearLayout.LayoutParams(MATCH, dp(58)).apply { topMargin = dp(18) })
 
         val row2 = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row2.addView(softButton("📊 查看记录") {
+        row2.addView(softButton(Str.viewRecords()) {
             startActivity(Intent(this, ReviewActivity::class.java))
         }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(6), 0) })
-        row2.addView(softButton("📝 监测日志") {
+        row2.addView(softButton(Str.viewLog()) {
             startActivity(Intent(this, LogActivity::class.java))
         }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(6), 0, 0, 0) })
         col.addView(row2, lp(12))
 
         // --- 清单 ---
         val tips = card()
-        tips.addView(label("睡前小清单"))
+        tips.addView(label(Str.checklistTitle()))
         for (t in listOf(
-            "🔌  接上充电器",
-            "📱  手机立在床头,摄像头对准上半身",
-            "🔕  开启勿扰,睡着后不要按电源键",
-            "💡  用前置补光时,屏幕要朝向你"
+            Str.tip1(),
+            Str.tip2(),
+            Str.tip3(),
+            Str.tip4()
         )) tips.addView(label(t, 14f, Color.WHITE), lp(8))
         col.addView(tips, lp(16))
+        val langCard = card()
+        langCard.addView(label(Str.langTitle()))
+        val langRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val curLang = Prefs.lang(this)
+        for ((txt, code) in listOf(Str.langAuto() to "auto", "简体中文" to "zh-Hans", "繁體中文" to "zh-Hant", "English" to "en")) {
+            val sel = code == curLang
+            langRow.addView(TextView(this).apply {
+                text = txt; textSize = 13f; gravity = Gravity.CENTER
+                setTextColor(if (sel) Color.parseColor("#1A1100") else Color.WHITE)
+                background = Theme.rounded(if (sel) Theme.ACCENT else Color.parseColor("#22344A"), dpf(12f))
+                setPadding(dp(4), dp(9), dp(4), dp(9))
+                setOnClickListener {
+                    Prefs.setLang(this@MainActivity, code)
+                    Str.init(this@MainActivity)
+                    recreate()
+                }
+            }, LinearLayout.LayoutParams(0, WRAP, 1f).apply { setMargins(dp(3), 0, dp(3), 0) })
+        }
+        langCard.addView(langRow, lp(8))
+        col.addView(langCard, lp(16))
         val vc = try {
             androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(packageManager.getPackageInfo(packageName, 0))
         } catch (e: Exception) { 0L }
-        col.addView(label("SnoreCam 版本 v$vc", 11f).apply { gravity = Gravity.CENTER }, lp(14))
+        col.addView(label(Str.version(vc), 11f).apply { gravity = Gravity.CENTER }, lp(14))
     }
 
     private fun buildPanel() {
@@ -367,7 +388,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(20), dp(18), dp(20), dp(18))
             visibility = View.GONE
         }
-        tvPanelTitle = label("监测中", 14f, Theme.ACCENT).apply { gravity = Gravity.CENTER }
+        tvPanelTitle = label(Str.monitoring(), 14f, Theme.ACCENT).apply { gravity = Gravity.CENTER }
         panel.addView(tvPanelTitle)
         tvPanelDb = TextView(this).apply {
             text = "-- dB"; textSize = 40f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
@@ -377,18 +398,18 @@ class MainActivity : AppCompatActivity() {
         tvPanelInfo = label("", 13f).apply { gravity = Gravity.CENTER }
         panel.addView(tvPanelInfo)
         btnArmNow = Button(this).apply {
-            text = "立即开始检测"; isAllCaps = false; textSize = 14f; setTextColor(Color.WHITE)
+            text = Str.armNow(); isAllCaps = false; textSize = 14f; setTextColor(Color.WHITE)
             background = Theme.rounded(Color.parseColor("#2A3F58"), dpf(14f))
             visibility = View.GONE
             setOnClickListener { arm() }
         }
         panel.addView(btnArmNow, LinearLayout.LayoutParams(MATCH, dp(44)).apply { topMargin = dp(10) })
         panel.addView(Button(this).apply {
-            text = "停止监测"; isAllCaps = false; textSize = 16f; setTextColor(Color.WHITE)
+            text = Str.stopMonitoring(); isAllCaps = false; textSize = 16f; setTextColor(Color.WHITE)
             background = Theme.rounded(Color.parseColor("#D9534F"), dpf(14f))
             setOnClickListener { stopMonitoring() }
         }, LinearLayout.LayoutParams(MATCH, dp(48)).apply { topMargin = dp(14) })
-        panel.addView(label("再点一下屏幕空白处收起", 11f).apply { gravity = Gravity.CENTER }, lp(8))
+        panel.addView(label(Str.panelHint(), 11f).apply { gravity = Gravity.CENTER }, lp(8))
     }
 
     private fun loadSettings() {
@@ -404,11 +425,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateTexts() {
         val m = Prefs.margin(this)
-        tvSens.text = "灵敏度:高于环境噪声 $m dB 才算鼾声"
+        tvSens.text = Str.sensLabel(m)
         val d = Prefs.delayMin(this)
-        tvDelay.text = if (d > 0) "🎵 点开始后,等 $d 分钟才开始检测(适合睡前听音乐)"
-        else "🎵 延迟开始检测:不延迟(点开始立刻检测)"
-        btnStart.text = if (d > 0) "开始监测($d 分钟后开始检测)" else "开始监测"
+        tvDelay.text = if (d > 0) Str.delayOn(d) else Str.delayOff()
+        btnStart.text = if (d > 0) Str.startWithDelay(d) else Str.startMonitoring()
     }
 
     private fun updateFacingUi() {
@@ -421,8 +441,8 @@ class MainActivity : AppCompatActivity() {
         style(segBack, !front)
         style(segFront, front)
         fillBox.visibility = if (front) View.VISIBLE else View.GONE
-        tvFill.text = "补光最大亮度:${(Prefs.fillMax(this) * 100).toInt()}%"
-        tvRamp.text = "渐亮时长:${Prefs.rampSec(this)} 秒(越长越不刺眼)"
+        tvFill.text = Str.fillMaxLabel((Prefs.fillMax(this) * 100).toInt())
+        tvRamp.text = Str.rampLabel(Prefs.rampSec(this))
     }
 
     // =====================================================================
@@ -431,13 +451,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (monitoring) MonLog.log(this, "应用回到前台")
+        if (monitoring) MonLog.log(this, "App back in foreground")
         else { loadSettings(); refreshPreview() }
     }
 
     override fun onPause() {
         super.onPause()
-        if (monitoring) MonLog.log(this, "⚠ 应用进入后台(屏幕可能被关闭或被切走,监测可能中断)")
+        if (monitoring) MonLog.log(this, "⚠ App went to background (screen may have turned off or app switched; monitoring may be interrupted)")
         else engine.stop()
     }
 
@@ -446,7 +466,7 @@ class MainActivity : AppCompatActivity() {
         if (hasMic()) { btnGrant.visibility = View.GONE; engine.start() }
         else {
             btnGrant.visibility = View.VISIBLE
-            tvLiveState.text = "需要麦克风权限"
+            tvLiveState.text = Str.needMicShort()
         }
     }
 
@@ -454,13 +474,13 @@ class MainActivity : AppCompatActivity() {
         tvLiveDb.text = "%.0f".format(fr.db)
         meter.set(fr.db, fr.noise, fr.threshold)
         tvLiveState.text = when {
-            fr.candidate -> "🔴 像鼾声"
-            fr.db >= fr.threshold -> "🟠 够响,但不像鼾声"
-            fr.db >= fr.noise + 3 -> "有声音"
-            else -> "安静"
+            fr.candidate -> Str.stateSnore()
+            fr.db >= fr.threshold -> Str.stateLoud()
+            fr.db >= fr.noise + 3 -> Str.stateSound()
+            else -> Str.stateQuiet()
         }
         if (previewTick++ % 8 == 0) {
-            tvThresh.text = "环境噪声 ${fr.noise.toInt()} dB + 灵敏度 ${Prefs.margin(this)} → 超过 ${fr.threshold.toInt()} dB 且像鼾声才触发"
+            tvThresh.text = Str.threshInfo(fr.noise.toInt(), Prefs.margin(this), fr.threshold.toInt())
         }
     }
 
@@ -485,7 +505,7 @@ class MainActivity : AppCompatActivity() {
         recentEvents.clear()
         home.visibility = View.GONE
         val delay = Prefs.delayMin(this)
-        MonLog.log(this, "=== 开始监测 === 摄像头=${Prefs.facing(this)} 灵敏度=${Prefs.margin(this)} 延迟=${delay}分钟")
+        MonLog.log(this, "=== Monitoring started === camera=${Prefs.facing(this)} sensitivity=${Prefs.margin(this)} delay=${delay}min")
         if (delay > 0) {
             armed = false
             armAt = SystemClock.elapsedRealtime() + delay * 60_000L
@@ -503,13 +523,13 @@ class MainActivity : AppCompatActivity() {
         countdown = 5
         panel.visibility = View.VISIBLE
         setBrightness(0.4f)
-        tvPanelInfo.text = "手机放好,摄像头对准自己"
+        tvPanelInfo.text = Str.placePhone()
         ui.removeCallbacks(countdownRunnable)
         ui.post(countdownRunnable)
     }
 
     private fun stopMonitoring() {
-        MonLog.log(this, "=== 停止监测 === 共 $eventsTotal 次鼾声事件,保存 $clipsSaved 段录像")
+        MonLog.log(this, "=== Monitoring stopped === $eventsTotal snore events, $clipsSaved clips saved")
         monitoring = false
         ui.removeCallbacks(hidePanelRunnable)
         ui.removeCallbacks(countdownRunnable)
@@ -528,7 +548,7 @@ class MainActivity : AppCompatActivity() {
         activeUi = false
         loadSettings()
         refreshPreview()
-        Toast.makeText(this, "已停止。到「查看记录」看今晚的结果", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, Str.stoppedToast(), Toast.LENGTH_LONG).show()
     }
 
     // =====================================================================
@@ -556,11 +576,11 @@ class MainActivity : AppCompatActivity() {
     private fun updatePanelTitle() {
         if (!armed) {
             val left = max(0L, armAt - SystemClock.elapsedRealtime()) / 1000
-            tvPanelTitle.text = "等待中 · %d:%02d 后开始检测".format(left / 60, left % 60)
+            tvPanelTitle.text = Str.waitingTitle("%d:%02d".format(left / 60, left % 60))
             tvPanelDb.text = "🎵"
-            tvPanelInfo.text = "此期间不听声音、不录像"
+            tvPanelInfo.text = Str.waitingInfo()
         } else {
-            tvPanelTitle.text = "监测中"
+            tvPanelTitle.text = Str.monitoring()
         }
     }
 
@@ -575,7 +595,7 @@ class MainActivity : AppCompatActivity() {
         lastEventAt = 0L
         resetMinute(SystemClock.elapsedRealtime())
         engine.start()
-        MonLog.log(this, "延迟结束,开始检测")
+        MonLog.log(this, "Delay finished, detection started")
         if (panel.visibility == View.VISIBLE) updatePanelTitle()
     }
 
@@ -668,7 +688,7 @@ class MainActivity : AppCompatActivity() {
         tvDb.setTextColor(if (fr.candidate) Color.parseColor("#FF5252") else Color.WHITE)
         if (panel.visibility == View.VISIBLE) {
             tvPanelDb.text = "%.0f dB".format(fr.db)
-            if (countdown <= 0) tvPanelInfo.text = "鼾声 $eventsTotal 次 · 已录 $clipsSaved 段"
+            if (countdown <= 0) tvPanelInfo.text = Str.panelInfo(eventsTotal, clipsSaved)
         }
 
         // 录像期间的 dB 时间序列
@@ -685,9 +705,9 @@ class MainActivity : AppCompatActivity() {
         mSum += fr.db; mN++; mMax = max(mMax, fr.db); mMin = min(mMin, fr.db)
         if (fr.candidate) mCand++
         if (now - minStartAt >= 60_000L && mN > 0) {
-            MonLog.log(this, "1分钟:声音 平均%.0f 最小%.0f 最大%.0f dB | 噪声底%.0f 触发线%.0f | 鼾声帧%d 事件%d | 已录%d段%s".format(
+            MonLog.log(this, "1 min: sound avg %.0f min %.0f max %.0f dB | noise floor %.0f trigger %.0f | snore frames %d events %d | clips %d%s".format(
                 mSum / mN, mMin, mMax, fr.noise, fr.threshold, mCand, mEvents, clipsSaved,
-                if (mMax - mMin < 0.5) "  ⚠声音几乎不变,麦克风可能静音" else ""))
+                if (mMax - mMin < 0.5) "  ⚠ sound almost constant, microphone may be muted" else ""))
             resetMinute(now)
         }
 
@@ -699,7 +719,7 @@ class MainActivity : AppCompatActivity() {
 
         // 录像卡死保护:超过 clip+30 秒还没结束就强制复位,保证后面还能继续录
         if (busy && now - busySince > CLIP_MS + Prefs.rampSec(this) * 1000L + 30_000L) {
-            MonLog.log(this, "⚠ 录像超时未结束,强制复位")
+            MonLog.log(this, "⚠ Recording did not finish in time, forced reset")
             ui.removeCallbacks(stopClipRunnable)
             try { recording?.stop() } catch (_: Exception) {}
             recording = null
@@ -716,18 +736,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onSnore(ev: SnoreDetector.Event) {
-        MonLog.log(this, "鼾声 峰值%.1f dB 平均%.1f dB 时长%d ms".format(ev.peakDb, ev.avgDb, ev.durMs))
+        MonLog.log(this, "Snore peak %.1f dB avg %.1f dB duration %d ms".format(ev.peakDb, ev.avgDb, ev.durMs))
         if (recording != null || busy) {
             sessionEvents.add(ev)
-            tvStatus.text = "● 录像中  鼾声 ${sessionEvents.size} 次 · 本次峰值 %.1f dB".format(ev.peakDb)
+            tvStatus.text = Str.recStatus(sessionEvents.size, ev.peakDb)
             return
         }
         recentEvents.add(ev)
         val cutoff = System.currentTimeMillis() - TRIGGER_WINDOW_MS
         recentEvents.removeAll { it.timeMs < cutoff }
-        tvStatus.text = "检测到鼾声 %.1f dB".format(ev.peakDb)
+        tvStatus.text = Str.snoreDetected(ev.peakDb)
         if (recentEvents.size >= 2) {
-            MonLog.log(this, "触发录像(${TRIGGER_WINDOW_MS / 1000} 秒内 ${recentEvents.size} 次鼾声)")
+            MonLog.log(this, "Recording triggered (${recentEvents.size} snores within ${TRIGGER_WINDOW_MS / 1000} s)")
             startRecording()
         }
     }
@@ -743,7 +763,7 @@ class MainActivity : AppCompatActivity() {
     /** 触发:前置摄像头时先让屏幕渐亮,亮到设定亮度后再开始录像;后置摄像头直接录 */
     private fun startRecording() {
         val provider = cameraProvider
-        if (provider == null) { MonLog.log(this, "⚠ 相机还没准备好,本次未录"); return }
+        if (provider == null) { MonLog.log(this, "⚠ Camera not ready, clip skipped"); return }
         if (busy) return
         busy = true
         busySince = SystemClock.elapsedRealtime()
@@ -776,12 +796,12 @@ class MainActivity : AppCompatActivity() {
             pendingFile = file
         } catch (e: Exception) {
             busy = false
-            MonLog.log(this, "⚠ 相机启动失败:${e.message}")
+            MonLog.log(this, "⚠ Camera failed to start: ${e.message}")
             return
         }
         if (Prefs.facing(this) == "front") {
             waitingLight = true
-            MonLog.log(this, "前置补光:屏幕亮到设定亮度后再开始录像(约 ${Prefs.rampSec(this)} 秒)")
+            MonLog.log(this, "Front light: recording starts after the screen reaches the set brightness (~${Prefs.rampSec(this)} s)")
             startFillLight()
         } else {
             beginRecordingNow()
@@ -807,15 +827,15 @@ class MainActivity : AppCompatActivity() {
                     timelineDb.clear(); bucketMax = -200.0; bucketN = 0
                 } else if (e is VideoRecordEvent.Finalize) onFinalized(file, e)
             }
-            tvStatus.text = "● 录像中(1 分钟)"
+            tvStatus.text = Str.recording1min()
             ui.postDelayed(stopClipRunnable, CLIP_MS)
-            MonLog.log(this, "开始录像")
+            MonLog.log(this, "Recording started")
         } catch (e: Exception) {
             busy = false
             recording = null
             cameraProvider?.unbindAll()
             stopFillLight()
-            MonLog.log(this, "⚠ 录像启动失败:${e.message}")
+            MonLog.log(this, "⚠ Recording failed to start: ${e.message}")
         }
     }
 
@@ -828,7 +848,7 @@ class MainActivity : AppCompatActivity() {
         stopFillLight()
         cameraProvider?.unbindAll()         // 录完立即关相机省电
         recentEvents.clear()
-        if (e.hasError()) MonLog.log(this, "⚠ 录像结束时有错误 code=${e.error} ${e.cause?.message ?: ""}")
+        if (e.hasError()) MonLog.log(this, "⚠ Recording ended with error code=${e.error} ${e.cause?.message ?: ""}")
         if (file.exists() && file.length() > 0 && sessionEvents.isNotEmpty()) {
             val peaks = sessionEvents.map { it.peakDb }
             if (startedAt > 0) {
@@ -846,12 +866,12 @@ class MainActivity : AppCompatActivity() {
             val appCtx = applicationContext
             Thread {
                 val face = PostureAnalyzer.analyzeSession(appCtx, sid, vpath)
-                MonLog.log(appCtx, "姿势识别:" + when (face) { "frontal" -> "正脸"; "profile" -> "侧脸"; else -> "没识别到人脸" })
+                MonLog.log(appCtx, "Posture analysis: " + when (face) { "frontal" -> "frontal"; "profile" -> "profile"; else -> "no face" })
             }.start()
-            MonLog.log(this, "已保存录像 ${file.name} 鼾声${sessionEvents.size}次 平均峰值%.1f dB 大小${file.length() / 1024}KB".format(peaks.average()))
-            tvStatus.text = "已保存:鼾声 ${sessionEvents.size} 次 · 平均峰值 %.1f dB".format(peaks.average())
+            MonLog.log(this, "Saved clip ${file.name} snores ${sessionEvents.size} avg peak %.1f dB size ${file.length() / 1024}KB".format(peaks.average()))
+            tvStatus.text = Str.savedStatus(sessionEvents.size, peaks.average())
         } else {
-            MonLog.log(this, "⚠ 这段录像没有保存(文件为空或无鼾声事件)")
+            MonLog.log(this, "⚠ Clip not saved (empty file or no snore events)")
         }
         // 录像用过麦克风:结束后重开一次采集,避免被静音后不恢复
         if (monitoring) engine.restart()

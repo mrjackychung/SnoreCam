@@ -44,6 +44,7 @@ class PlaybackActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Str.init(this)
         val id = intent.getLongExtra("id", 0L)
         val found = EventStore.load(this).find { it.id == id }
         if (found == null) { finish(); return }
@@ -81,7 +82,7 @@ class PlaybackActivity : AppCompatActivity() {
             setPadding(dp(8), dp(6), dp(16), dp(6))
         }
         top.addView(TextView(this).apply {
-            text = "‹ 返回"; textSize = 16f; setTextColor(Theme.ACCENT)
+            text = Str.back(); textSize = 16f; setTextColor(Theme.ACCENT)
             setPadding(dp(8), dp(8), dp(14), dp(8))
             setOnClickListener { finish() }
         })
@@ -91,11 +92,11 @@ class PlaybackActivity : AppCompatActivity() {
         })
         top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         top.addView(TextView(this).apply {
-            text = "💾 保存"; textSize = 14f; setTextColor(Theme.ACCENT)
+            text = Str.save(); textSize = 14f; setTextColor(Theme.ACCENT)
             setPadding(dp(10), dp(8), dp(10), dp(8)); setOnClickListener { saveVideo() }
         })
         top.addView(TextView(this).apply {
-            text = "📤 分享"; textSize = 14f; setTextColor(Theme.ACCENT)
+            text = Str.share(); textSize = 14f; setTextColor(Theme.ACCENT)
             setPadding(dp(10), dp(8), dp(4), dp(8))
             setOnClickListener { Exporter.share(this@PlaybackActivity, File(session.file)) }
         })
@@ -112,9 +113,9 @@ class PlaybackActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), dp(10), dp(16), dp(2))
         }
-        val c1 = statCol("播放位置", "0:00", Color.WHITE)
-        val c2 = statCol("此刻 dB", "--", Color.WHITE)
-        val c3 = statCol("本段峰值 dB", "%.1f".format(session.peakDb), Loud.color(session.peakDb))
+        val c1 = statCol(Str.statPos(), "0:00", Color.WHITE)
+        val c2 = statCol(Str.statNow(), "--", Color.WHITE)
+        val c3 = statCol(Str.statPeak(), "%.1f".format(session.peakDb), Loud.color(session.peakDb))
         tvPos = c1.second; tvNow = c2.second; tvPeak = c3.second
         for (c in listOf(c1.first, c2.first, c3.first)) stats.addView(c, LinearLayout.LayoutParams(0, WRAP, 1f))
         root.addView(stats)
@@ -135,8 +136,8 @@ class PlaybackActivity : AppCompatActivity() {
             setPadding(0, dp(6), 0, dp(2))
         }
         val items = listOf(
-            Pair("安静 <50", Loud.color(0.0)), Pair("轻微 50-60", Loud.color(55.0)),
-            Pair("响亮 60-70", Loud.color(65.0)), Pair("超响 ≥70", Loud.color(75.0))
+            Pair(Str.legendQuiet(), Loud.color(0.0)), Pair(Str.legendLight(), Loud.color(55.0)),
+            Pair(Str.legendLoud(), Loud.color(65.0)), Pair(Str.legendEpic(), Loud.color(75.0))
         )
         for (item in items) legend.addView(TextView(this).apply {
             text = "● ${item.first}"; textSize = 11f; setTextColor(item.second); setPadding(dp(7), 0, dp(7), 0)
@@ -148,9 +149,9 @@ class PlaybackActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
-        val bBack = Button(this).apply { text = "⏪ 5秒"; setOnClickListener { seekBy(-5000) } }
-        btnPlay = Button(this).apply { text = "▶ 播放"; setOnClickListener { togglePlay() } }
-        val bFwd = Button(this).apply { text = "5秒 ⏩"; setOnClickListener { seekBy(5000) } }
+        val bBack = Button(this).apply { text = Str.back5(); setOnClickListener { seekBy(-5000) } }
+        btnPlay = Button(this).apply { text = Str.play(); setOnClickListener { togglePlay() } }
+        val bFwd = Button(this).apply { text = Str.fwd5(); setOnClickListener { seekBy(5000) } }
         ctrl.addView(bBack); ctrl.addView(btnPlay); ctrl.addView(bFwd)
         root.addView(ctrl)
 
@@ -165,9 +166,9 @@ class PlaybackActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, dp(10))
         }
-        btnSide = Button(this).apply { text = "侧睡"; setOnClickListener { setLabel("side") } }
-        btnSupine = Button(this).apply { text = "仰睡"; setOnClickListener { setLabel("supine") } }
-        val btnAuto = Button(this).apply { text = "自动识别姿势"; setOnClickListener { runAnalysis() } }
+        btnSide = Button(this).apply { text = Str.labelName("side"); setOnClickListener { setLabel("side") } }
+        btnSupine = Button(this).apply { text = Str.labelName("supine"); setOnClickListener { setLabel("supine") } }
+        val btnAuto = Button(this).apply { text = Str.autoPosture(); setOnClickListener { runAnalysis() } }
         pos.addView(btnSide); pos.addView(btnSupine); pos.addView(btnAuto)
         root.addView(pos)
 
@@ -179,7 +180,7 @@ class PlaybackActivity : AppCompatActivity() {
             timeline.invalidate()
             video.seekTo(1)
         }
-        video.setOnCompletionListener { btnPlay.text = "▶ 播放" }
+        video.setOnCompletionListener { btnPlay.text = Str.play() }
         video.setOnClickListener { togglePlay() }
         video.setVideoPath(session.file)
     }
@@ -205,7 +206,7 @@ class PlaybackActivity : AppCompatActivity() {
                 tvNow.setTextColor(Loud.color(db.toDouble()))
             }
         }
-        btnPlay.text = if (video.isPlaying) "⏸ 暂停" else "▶ 播放"
+        btnPlay.text = if (video.isPlaying) Str.pause() else Str.play()
     }
 
     // ---------- 姿势 ----------
@@ -214,14 +215,14 @@ class PlaybackActivity : AppCompatActivity() {
         btnSide.alpha = if (session.label == "side") 1f else 0.45f
         btnSupine.alpha = if (session.label == "supine") 1f else 0.45f
         val faceT = when (session.face) {
-            "frontal" -> "识别到正脸"
-            "profile" -> "识别到侧脸"
-            "none" -> "没识别到人脸(画面太暗或没拍到脸)"
-            else -> "未识别"
+            "frontal" -> Str.faceFrontal()
+            "profile" -> Str.faceProfile()
+            "none" -> Str.faceNone()
+            else -> Str.faceUnknown()
         }
-        val lbl = if (session.label.isEmpty()) "未标记"
-        else Theme.labelName(session.label) + (if (session.autoLabel) "(自动)" else "")
-        tvPosture.text = "$faceT · 当前:$lbl"
+        val lbl = if (session.label.isEmpty()) Str.labelName("")
+        else Theme.labelName(session.label) + (if (session.autoLabel) Str.autoParen() else "")
+        tvPosture.text = Str.postureLine(faceT, lbl)
     }
 
     private fun setLabel(l: String) {
@@ -235,7 +236,7 @@ class PlaybackActivity : AppCompatActivity() {
     }
 
     private val storagePerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
-        if (ok) saveVideo() else Toast.makeText(this, "没有存储权限,无法保存", Toast.LENGTH_LONG).show()
+        if (ok) saveVideo() else Toast.makeText(this, Str.noStoragePerm(), Toast.LENGTH_LONG).show()
     }
 
     /** 把录像复制到手机相册(Movies/SnoreCam),可在相册/文件管理器里看到并拷走 */
@@ -246,11 +247,11 @@ class PlaybackActivity : AppCompatActivity() {
             return
         }
         val ok = Exporter.saveToGallery(this, File(session.file))
-        Toast.makeText(this, if (ok) "已保存到相册(Movies/SnoreCam)" else "保存失败", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, if (ok) Str.savedToGallery() else Str.saveFailed(), Toast.LENGTH_LONG).show()
     }
 
     private fun runAnalysis() {
-        tvPosture.text = "姿势识别中…"
+        tvPosture.text = Str.analyzing()
         val appCtx = applicationContext
         val id = session.id
         val path = session.file

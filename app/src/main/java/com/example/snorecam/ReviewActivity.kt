@@ -33,7 +33,7 @@ class ReviewActivity : AppCompatActivity() {
     private val fmtFull = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
     private val fmtTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private val fmtHm = SimpleDateFormat("HH:mm", Locale.getDefault())
-    private val fmtChip = SimpleDateFormat("M/d E", Locale.CHINA)
+    private val fmtChip by lazy { SimpleDateFormat("M/d E", Str.locale()) }
 
     private lateinit var list: ListView
     private lateinit var chipScroll: HorizontalScrollView
@@ -75,6 +75,7 @@ class ReviewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Str.init(this)
         list = ListView(this).apply {
             divider = null
             dividerHeight = 0
@@ -125,7 +126,7 @@ class ReviewActivity : AppCompatActivity() {
             text = "--"; setTextColor(Color.WHITE); textSize = 26f; typeface = Typeface.DEFAULT_BOLD
         }
         root.addView(big)
-        val sub = TextView(this).apply { text = "暂无数据"; setTextColor(Theme.SUB); textSize = 11f }
+        val sub = TextView(this).apply { text = Str.noData(); setTextColor(Theme.SUB); textSize = 11f }
         root.addView(sub)
         return Card(root, big, sub)
     }
@@ -140,10 +141,10 @@ class ReviewActivity : AppCompatActivity() {
         // 标题行
         val titleRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         titleRow.addView(TextView(this).apply {
-            text = "鼾声记录"; textSize = 24f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
+            text = Str.recordsTitle(); textSize = 24f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
         }, LinearLayout.LayoutParams(0, WRAP, 1f))
         titleRow.addView(TextView(this).apply {
-            text = "⚙ 镜头位置"; textSize = 13f; setTextColor(Theme.ACCENT)
+            text = Str.camPosBtn(); textSize = 13f; setTextColor(Theme.ACCENT)
             setPadding(dp(8), dp(8), dp(4), dp(8)); setOnClickListener { showCamDialog() }
         })
         h.addView(titleRow)
@@ -165,8 +166,8 @@ class ReviewActivity : AppCompatActivity() {
         tvScope = TextView(this).apply { textSize = 12f; setTextColor(Theme.SUB); setPadding(0, dp(12), 0, dp(6)) }
         h.addView(tvScope)
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        cardSide = makeCard("侧睡", Theme.SIDE)
-        cardSupine = makeCard("仰睡", Theme.SUPINE)
+        cardSide = makeCard(Str.labelName("side"), Theme.SIDE)
+        cardSupine = makeCard(Str.labelName("supine"), Theme.SUPINE)
         row.addView(cardSide.root, LinearLayout.LayoutParams(0, WRAP, 1f).apply { setMargins(0, 0, dp(5), 0) })
         row.addView(cardSupine.root, LinearLayout.LayoutParams(0, WRAP, 1f).apply { setMargins(dp(5), 0, 0, 0) })
         h.addView(row)
@@ -202,7 +203,7 @@ class ReviewActivity : AppCompatActivity() {
         sliderRow.addView(tvSeekTime)
         chartBox.addView(sliderRow, LinearLayout.LayoutParams(MATCH, WRAP).apply { topMargin = dp(4) })
         chartBox.addView(TextView(this).apply {
-            text = "拖动滑块(或直接在图上滑动)选择时间,会自动选中离得最近的一段录像"
+            text = Str.sliderHint()
             textSize = 11f; setTextColor(Theme.SUB); setPadding(dp(2), 0, 0, dp(8))
         })
 
@@ -218,11 +219,11 @@ class ReviewActivity : AppCompatActivity() {
         tvSelInfo = TextView(this).apply { textSize = 12f; setTextColor(Theme.SUB); setPadding(0, dp(3), 0, dp(10)) }
         selCard.addView(tvSelInfo)
         val btns = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val play = pill("▶ 回放") { selected?.let { openPlayback(it) } }.apply {
+        val play = pill(Str.playBtn()) { selected?.let { openPlayback(it) } }.apply {
             background = Theme.rounded(Theme.ACCENT, dpf(14f)); setTextColor(Color.parseColor("#1A1100"))
         }
-        pillSide = pill("侧睡") { setSelectedLabel("side") }
-        pillSupine = pill("仰睡") { setSelectedLabel("supine") }
+        pillSide = pill(Str.labelName("side")) { setSelectedLabel("side") }
+        pillSupine = pill(Str.labelName("supine")) { setSelectedLabel("supine") }
         btns.addView(play)
         btns.addView(pillSide, LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(dp(8), 0, 0, 0) })
         btns.addView(pillSupine, LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(dp(8), 0, 0, 0) })
@@ -235,7 +236,7 @@ class ReviewActivity : AppCompatActivity() {
         }
         h.addView(tvListTitle)
         tvEmpty = TextView(this).apply {
-            text = "还没有录像。\n睡前在首页点「开始监测」,打呼时会自动录像。"
+            text = Str.noRecords()
             textSize = 14f; setTextColor(Theme.SUB); gravity = Gravity.CENTER
             setPadding(0, dp(40), 0, dp(40)); visibility = View.GONE
         }
@@ -283,7 +284,7 @@ class ReviewActivity : AppCompatActivity() {
             if (sel) selView = v
             chipRow.addView(v, LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, dp(8), 0) })
         }
-        addChip("全部", -1L)
+        addChip(Str.all(), -1L)
         for (k in nights) {
             val n = all.count { nightKey(it.id) == k }
             addChip("${fmtChip.format(Date(k))} · $n", k)
@@ -295,30 +296,30 @@ class ReviewActivity : AppCompatActivity() {
     private fun fillCard(card: Card, scope: List<Session>, label: String) {
         val s = scope.filter { it.label == label }
         if (s.isEmpty()) {
-            card.big.text = "--"; card.sub.text = "暂无数据"
+            card.big.text = "--"; card.sub.text = Str.noData()
         } else {
             card.big.text = "%.1f".format(s.map { it.avgPeakDb }.average())
-            card.sub.text = "平均峰值 dB · ${s.size} 段 · 最大 %.0f".format(s.maxOf { it.peakDb })
+            card.sub.text = Str.cardSub(s.size, s.maxOf { it.peakDb })
         }
     }
 
     private fun applyScope(keepId: Long?) {
         val scope = if (curNight == -1L) all else all.filter { nightKey(it.id) == curNight }
         shown = scope
-        tvScope.text = "统计范围:" + if (curNight == -1L) "全部录像" else "${fmtChip.format(Date(curNight))} 晚"
+        tvScope.text = if (curNight == -1L) Str.scopeAll() else Str.scopeNight(fmtChip.format(Date(curNight)))
         fillCard(cardSide, scope, "side")
         fillCard(cardSupine, scope, "supine")
         val side = scope.filter { it.label == "side" }
         val sup = scope.filter { it.label == "supine" }
         tvDiff.text = if (side.isNotEmpty() && sup.isNotEmpty()) {
             val d = sup.map { it.avgPeakDb }.average() - side.map { it.avgPeakDb }.average()
-            "仰睡比侧睡${if (d >= 0) "高" else "低"} %.1f dB".format(abs(d))
-        } else "两种姿势都有记录后,这里显示分贝差"
+            Str.diffText(d)
+        } else Str.diffNone()
 
         val empty = all.isEmpty()
         tvEmpty.visibility = if (empty) View.VISIBLE else View.GONE
         tvListTitle.visibility = if (empty) View.GONE else View.VISIBLE
-        tvListTitle.text = (if (curNight == -1L) "全部录像" else "本晚录像") + "(${scope.size} 段,点击回放,长按删除)"
+        tvListTitle.text = Str.listTitle(curNight == -1L, scope.size)
 
         if (curNight == -1L || scope.isEmpty()) {
             chartBox.visibility = View.GONE
@@ -364,8 +365,8 @@ class ReviewActivity : AppCompatActivity() {
         if (s == null) { selCard.visibility = View.GONE; return }
         selCard.visibility = View.VISIBLE
         tvSelTitle.text = fmtTime.format(Date(s.id)) + "  ·  " + Theme.labelName(s.label) +
-            (if (s.autoLabel) "(自动)" else "")
-        tvSelInfo.text = "峰值 %.1f dB · 平均峰值 %.1f dB · 鼾声 %d 次".format(s.peakDb, s.avgPeakDb, s.count)
+            (if (s.autoLabel) Str.autoParen() else "")
+        tvSelInfo.text = Str.selInfo(s.peakDb, s.avgPeakDb, s.count)
         fun style(v: TextView, sel: Boolean, color: Int) {
             v.background = Theme.rounded(if (sel) color else Color.parseColor("#22344A"), dpf(14f))
         }
@@ -395,7 +396,7 @@ class ReviewActivity : AppCompatActivity() {
         val appCtx = applicationContext
         Thread {
             for ((i, s) in todo.withIndex()) {
-                runOnUiThread { tvAnalyze.text = "正在自动识别姿势 ${i + 1}/${todo.size} …" }
+                runOnUiThread { tvAnalyze.text = Str.analyzingProgress(i + 1, todo.size) }
                 PostureAnalyzer.analyzeSession(appCtx, s.id, s.file)
                 runOnUiThread { if (!isFinishing) reload(selected?.id) }
             }
@@ -410,10 +411,10 @@ class ReviewActivity : AppCompatActivity() {
     private fun showCamDialog() {
         val cur = if (Prefs.camMode(this) == "footend") 1 else 0
         AlertDialog.Builder(this)
-            .setTitle("镜头位置(用于自动判断姿势)")
+            .setTitle(Str.camDialogTitle())
             .setSingleChoiceItems(arrayOf(
-                "床边:从床侧拍,正脸朝镜头 = 侧睡,侧脸 = 仰睡",
-                "床尾/枕边:正对脸拍,正脸 = 仰睡,侧脸 = 侧睡"
+                Str.camBedside(),
+                Str.camFootend()
             ), cur) { d, which ->
                 val mode = if (which == 1) "footend" else "bedside"
                 Prefs.setCamMode(this, mode)
@@ -428,20 +429,20 @@ class ReviewActivity : AppCompatActivity() {
                 d.dismiss()
                 reload(selected?.id)
             }
-            .setNegativeButton("关闭", null)
+            .setNegativeButton(Str.close(), null)
             .show()
     }
 
     private fun confirmDelete(s: Session) {
         AlertDialog.Builder(this)
-            .setMessage("删除 ${fmtFull.format(Date(s.id))} 这段录像?")
-            .setPositiveButton("删除") { _, _ ->
+            .setMessage(Str.confirmDelete(fmtFull.format(Date(s.id))))
+            .setPositiveButton(Str.delete()) { _, _ ->
                 File(s.file).delete()
                 File(s.file + ".json").delete()
                 EventStore.save(this, EventStore.load(this).filter { it.id != s.id })
                 reload(null)
             }
-            .setNegativeButton("取消", null)
+            .setNegativeButton(Str.cancel(), null)
             .show()
     }
 
@@ -475,14 +476,14 @@ class ReviewActivity : AppCompatActivity() {
                 textSize = 15f; setTextColor(Color.WHITE); typeface = Typeface.DEFAULT_BOLD
             })
             line1.addView(TextView(ctx).apply {
-                text = Theme.labelName(s.label) + (if (s.autoLabel) "·自动" else "")
+                text = Theme.labelName(s.label) + (if (s.autoLabel) Str.autoShort() else "")
                 textSize = 10f; setTextColor(Color.WHITE)
                 background = Theme.rounded(Theme.labelColor(s.label), ctx.dpf(8f))
                 setPadding(ctx.dp(7), ctx.dp(1), ctx.dp(7), ctx.dp(1))
             }, LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(ctx.dp(8), 0, 0, 0) })
             mid.addView(line1)
             mid.addView(TextView(ctx).apply {
-                text = "鼾声 ${s.count} 次 · 平均峰值 %.0f dB".format(s.avgPeakDb)
+                text = Str.rowInfo(s.count, s.avgPeakDb)
                 textSize = 11f; setTextColor(Theme.SUB)
             })
             row.addView(mid, LinearLayout.LayoutParams(0, WRAP, 1f))

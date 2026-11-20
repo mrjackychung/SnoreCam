@@ -59,7 +59,7 @@ class TimelineView(ctx: Context) : View(ctx) {
             p.color = Color.parseColor("#8A97A6")
             p.textAlign = Paint.Align.CENTER
             p.textSize = 13 * d
-            c.drawText("没有声轨数据", w / 2, cy, p)
+            c.drawText(Str.noTimeline(), w / 2, cy, p)
         } else {
             val n = max(1, (dur / stepMs).toInt())
             val bw = max(1.5f * d, w / n * 0.75f)

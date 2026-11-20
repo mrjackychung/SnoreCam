@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 class LogActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Str.init(this)
         val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
 
@@ -21,10 +22,10 @@ class LogActivity : AppCompatActivity() {
             setPadding(dp(8), dp(28), dp(16), dp(6))
         }
         top.addView(TextView(this).apply {
-            text = "‹ 返回"; textSize = 16f; setTextColor(Theme.ACCENT)
+            text = Str.back(); textSize = 16f; setTextColor(Theme.ACCENT)
             setPadding(dp(8), dp(8), dp(14), dp(8)); setOnClickListener { finish() }
         })
-        top.addView(TextView(this).apply { text = "监测日志"; textSize = 18f; setTextColor(Color.WHITE) },
+        top.addView(TextView(this).apply { text = Str.logTitle(); textSize = 18f; setTextColor(Color.WHITE) },
             LinearLayout.LayoutParams(0, WRAP, 1f))
         root.addView(top)
 
@@ -35,12 +36,12 @@ class LogActivity : AppCompatActivity() {
         val scroll = ScrollView(this).apply { addView(tv) }
         fun load() {
             val t = MonLog.read(this@LogActivity)
-            tv.text = if (t.isEmpty()) "还没有日志。开始监测后,这里会记录每个鼾声、触发、保存和失败原因,以及每分钟的环境声统计。"
+            tv.text = if (t.isEmpty()) Str.logEmpty()
             else t.takeLast(40000)
             scroll.post { scroll.fullScroll(android.view.View.FOCUS_DOWN) }
         }
         top.addView(Button(this).apply {
-            text = "清空"; isAllCaps = false
+            text = Str.clear(); isAllCaps = false
             setOnClickListener { MonLog.clear(this@LogActivity); load() }
         })
         root.addView(scroll, LinearLayout.LayoutParams(MATCH, 0, 1f))
